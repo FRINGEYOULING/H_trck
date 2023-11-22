@@ -2,17 +2,16 @@
 #include <HAL.h>
 #include <lvgl.h>
 #include <TFT_eSPI.h>
-#include <myui.h>
 #include <SD.h>
+#include "Start_up.h"
 // put function declarations here:
 void setup() {
   // put your setup code here, to run once:
   HAL::HAL_Init();
-  
+  yuanshen_qd();
   Serial.printf("Deafult free size: %d\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
   Serial.printf("PSRAM free size: %d\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
   Serial.printf("Flash size: %d bytes\n", ESP.getFlashChipSize());
-  yuanshen_qidong();
 
 }
 
