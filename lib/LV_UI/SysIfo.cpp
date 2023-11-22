@@ -4,6 +4,10 @@
 #include "SysIfo.h"
 #include "lvgl.h"
 #include "Diplat.h"
+#include "TinyGPS++.h"
+#include "Ticker.h"
+#include "animotion.h"
+
 LV_IMG_DECLARE(img_src_system_info);
 LV_IMG_DECLARE(img_src_bicycle);
 LV_IMG_DECLARE(img_src_storage);
@@ -16,8 +20,16 @@ LV_FONT_DECLARE(font_bahnschrift_17);
 LV_FONT_DECLARE(font_bahnschrift_13);
 #define ITEM_HEIGHT_MIN   100
 #define ITEM_PAD          ((LV_VER_RES - ITEM_HEIGHT_MIN) / 2)
-
-
+extern location loc;
+extern Sport_Time St;
+Ticker date_update;
+extern TinyGPSPlus gps;
+extern char UTC_BUFF[128];
+Sys_Registe sysRegiste;
+extern int16_t acx, acy, acz;
+extern int16_t grx, gry, grz;
+extern int16_t mgx, mgy, mgz;
+extern int16_t temp;
 struct
 {
     item_t sport;
@@ -25,7 +37,7 @@ struct
     item_t mag;
     item_t imu;
     item_t rtc;
-    item_t battery;
+    // item_t battery;
     item_t storage;
     item_t system;
 } ui;
@@ -36,9 +48,69 @@ typedef struct {
     lv_style_t data;
     lv_style_t focus;
 }Style_class;
+lv_timer_t *task;
+int datecount=0;
+float distance = 0;
+char sp_time[64];
+char IMU_Date[256];
+uint8_t Last_Speed;
+uint8_t Now_Speed = 0;
+uint8_t Max_Speed = 0;
+void Date_Update(lv_timer_t *tmr)
+{
+    sprintf(sp_time,"%02d:%02d:%02d",St.hour,St.min,St.sec);
+    sprintf(IMU_Date,"%d\n%d\n%d\n%d\n%d\n%d",acx,acy,acz,grx,gry,grz);
+    sysRegiste.SetGPS(gps.location.lat(),gps.location.lng(),
+        gps.altitude.meters(),UTC_BUFF,gps.course.deg(),gps.speed.kmph());
+    sysRegiste.SetMAG(gps.course.deg(),mgx* 1200 / 4096,mgy* 1200 / 4096,mgz* 1200 / 4096);
+    sysRegiste.SetIMU(temp/100,IMU_Date);
+    sysRegiste.SetRTC(UTC_BUFF);
+    sysRegiste.SetSport(Trip,sp_time,Max_Speed);
+    sysRegiste.SetSystem("Platform","YOULING","LVGL-8.3",0,"GCC","2023-11-17");
+
+}
+
+void Time_reset(uint32_t period,int32_t repeat_count)
+{
+    task = lv_timer_create(Date_Update,period,0);
+    lv_timer_set_repeat_count(task,repeat_count);
+}
+
+void Sysinfo_unint()
+{
+    Style_Reset();
+    lv_timer_pause(task);
+    lv_obj_del(root);
+    Diplat();
+    Menu_Load(main_home,LV_SCR_LOAD_ANIM_MOVE_BOTTOM,750,50);
+}
+
+void Sysinfo_install()
+{
+    lv_obj_del(main_home);
+    Create();
+    Menu_Load(lv_scr_act(),LV_SCR_LOAD_ANIM_MOVE_LEFT,750,50);
+}
+
+void onEvent(lv_event_t *e)
+{
+    lv_obj_t* obj = lv_event_get_current_target(e);
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code==LV_EVENT_CLICKED)
+    {
+        if (lv_obj_has_state(obj, LV_STATE_FOCUSED))
+        {
+            Sysinfo_unint();
+            Menu_state = 0;
+        }
+    }
+        
+    
+}
 
 Style_class style;
 lv_obj_t* root;
+
 void Create()
 {
     root = lv_obj_create(lv_scr_act());
@@ -124,16 +196,16 @@ void Create()
     );
 //
 //    /* Item Battery */
-    Item_Create(
-            &ui.battery,
-            root,
-            "Battery",
-            &img_src_battery_info,
+    // Item_Create(
+    //         &ui.battery,
+    //         root,
+    //         "Battery",
+    //         &img_src_battery_info,
 
-            "Usage\n"
-            "Voltage\n"
-            "Status"
-    );
+    //         "Usage\n"
+    //         "Voltage\n"
+    //         "Status"
+    // );
 //
 //    /* Item Storage */
     Item_Create(
@@ -159,11 +231,13 @@ void Create()
             "Author\n"
             "LVGL\n"
             "SysTick\n"
-            "Compiler\n\n"
+            "Compiler\n"
             "Build\n"
     );
 
     Group_Init();
+    Time_reset(200,-1);
+    // date_update.attach_ms(200,Date_Update);
 }
 
 
@@ -189,7 +263,10 @@ void Group_Init()
     {
         lv_group_add_obj(group, item_grp[i].icon);
     }
-
+    for (int i = 0; i < sizeof(ui) / sizeof(item_t); i++)
+    {
+        lv_obj_add_event_cb(item_grp[i].icon, onEvent, LV_EVENT_CLICKED, 0);
+    }
     lv_group_focus_obj(item_grp[0].icon);
 }
 
@@ -237,7 +314,7 @@ void Style_Init()
     lv_style_set_transition(&style.icon, &trans);
 
     lv_style_init(&style.info);
-    lv_style_set_text_font(&style.info, &font_bahnschrift_17);
+    lv_style_set_text_font(&style.info, &font_bahnschrift_13);
     lv_style_set_text_color(&style.info, lv_color_hex(0x999999));
 
     lv_style_init(&style.data);
@@ -322,4 +399,155 @@ void Item_Create(
     height = LV_MAX(height, ITEM_HEIGHT_MIN);
     lv_obj_set_height(cont, height);
     lv_obj_set_height(icon, height);
+}
+
+
+void Sys_Registe::SetSport(
+    float trip,
+    const char* time,
+    float maxSpd
+)
+{
+    lv_label_set_text_fmt(
+        ui.sport.labelData,
+        "%0.2fkm\n"
+        "%s\n"
+        "%0.1fkm/h",
+        trip,
+        time,
+        maxSpd
+    );
+}
+
+void Sys_Registe::SetGPS(
+    float lat,
+    float lng,
+    float alt,
+    const char* utc,
+    float course,
+    float speed
+)
+{
+    lv_label_set_text_fmt(
+        ui.gps.labelData,
+        "%0.6f\n"
+        "%0.6f\n"
+        "%0.2fm\n"
+        "%s\n"
+        "%0.1f deg\n"
+        "%0.1fkm/h",
+        lat,
+        lng,
+        alt,
+        utc,
+        course,
+        speed
+    );
+}
+
+void Sys_Registe::SetMAG(
+    float dir,
+    int x,
+    int y,
+    int z
+)
+{
+    lv_label_set_text_fmt(
+        ui.mag.labelData,
+        "%0.1f deg\n"
+        "%d\n"
+        "%d\n"
+        "%d",
+        dir,
+        x,
+        y,
+        z
+    );
+}
+
+void Sys_Registe::SetIMU(
+    int step,
+    const char* info
+)
+{
+    lv_label_set_text_fmt(
+        ui.imu.labelData,
+        "%d\n"
+        "%s",
+        step,
+        info
+    );
+}
+
+void Sys_Registe::SetRTC(
+    const char* dateTime
+)
+{
+    lv_label_set_text(
+        ui.rtc.labelData,
+        dateTime
+    );
+}
+
+// void Sys_Registe::SetBattery(
+//     int usage,
+//     float voltage,
+//     const char* state
+// )
+// {
+//     lv_label_set_text_fmt(
+//         ui.battery.labelData,
+//         "%d%%\n"
+//         "%0.2fV\n"
+//         "%s",
+//         usage,
+//         voltage,
+//         state
+//     );
+// }
+
+void Sys_Registe::SetStorage(
+    const char* detect,
+    const char* size,
+    const char* type,
+    const char* version
+)
+{
+    lv_label_set_text_fmt(
+        ui.storage.labelData,
+        "%s\n"
+        "%s\n"
+        "%s\n"
+        "%s",
+        detect,
+        size,
+        type,
+        version
+    );
+}
+
+void Sys_Registe::SetSystem(
+    const char* firmVer,
+    const char* authorName,
+    const char* lvglVer,
+    unsigned long bootTime,
+    const char* compilerName,
+    const char* bulidTime
+)
+{
+    lv_label_set_text_fmt(
+        ui.system.labelData,
+        "%s\n"
+        "%s\n"
+        "%s\n"
+        "%ld\n"
+        "%s\n"
+        "%s",
+        firmVer,
+        authorName,
+        lvglVer,
+        bootTime,
+        compilerName,
+        bulidTime
+    );
 }

@@ -6,6 +6,11 @@
 #include "lvgl.h"
 #include <animotion.h>
 #include "SysIfo.h"
+#include "Ticker.h"
+#include "Statue_Bar.h"
+#include "TinyGPS++.h"
+#include "Livemap.h"
+extern location loc;
 LV_FONT_DECLARE(font_bahnschrift_65);
 LV_FONT_DECLARE(font_bahnschrift_17);
 LV_FONT_DECLARE(font_bahnschrift_13);
@@ -13,41 +18,153 @@ LV_IMG_DECLARE(img_src_menu);
 LV_IMG_DECLARE(img_src_locate);
 LV_IMG_DECLARE(img_src_pause);
 LV_IMG_DECLARE(img_src_start);
+LV_IMG_DECLARE(img_src_stop);
 #define Sysinfo 1
 #define map_loca 2
 lv_obj_t *main_home;
 uint8_t Menu_state = 0;
+Ticker Sport_Tick;
 typedef struct {
     lv_obj_t* menu;
     lv_obj_t *start;
     lv_obj_t *locat;
 }Button_num;
+
+uint8_t Sport_Statue = 0;
+
+typedef struct 
+{
+    lv_obj_t* Speed;
+    lv_obj_t* AVG;
+    lv_obj_t* Time;
+    lv_obj_t* Trip;
+    lv_obj_t* Calorie;
+}Untxt_num;
+
+typedef struct
+{
+    float Avg_speed;
+    float Trip;
+    float Calorie_num;
+}Sport_mation;
+Sport_mation sport_num;
+Untxt_num unit;
+extern TinyGPSPlus gps;
 Button_num button;
 lv_group_t *btn_group;
+lv_timer_t *update;
+
+int cnt = 0;
+float full_speed = 0;
+float Trip = 0;
+void Sub_Date(lv_timer_t *tmr)
+{
+    Trip += loc.distance/1000;
+    lv_label_set_text_fmt(unit.Speed,"%.1f",gps.speed.kmph());
+    lv_label_set_text_fmt(unit.Trip,"%.2f",Trip);
+    lv_label_set_text_fmt(unit.Calorie,"%.2f",(Trip)*0.6142*75);
+    cnt++;
+    full_speed+=gps.speed.kmph();
+    if(cnt>=9)
+    {
+        sport_num.Avg_speed = full_speed/10;
+        lv_label_set_text_fmt(unit.AVG,"%.2f",sport_num.Avg_speed);
+        full_speed = 0;
+        cnt = 0;
+    }
+}
+
 static void Btn_event(lv_event_t *e)
 {
     lv_obj_t *obj = lv_event_get_target(e);
     lv_event_code_t code = lv_event_get_code(e);
     if(obj == button.menu)
     {
-        lv_obj_del(main_home);
-        Create();
-        Menu_Load(lv_scr_act(),LV_SCR_LOAD_ANIM_MOVE_LEFT,750,50);
-        Menu_state = Sysinfo;
+        if(update!=NULL)
+        {
+            lv_timer_pause(update);
+        }
+        Sysinfo_install();
+        Menu_state = 1;
     }
-//    else if(obj == button.start)
-//    {
-//        lv_obj_del(main_home);
-//        yuanshen_qd();
-//    }
-//    else if(obj == button.locat)
-//    {
-//        lv_scr_load_anim_t anim_type = LV_SCR_LOAD_ANIM_MOVE_RIGHT;
-//        Menu_Load(main_home,anim_type,750,50);
-//    }
+    if(obj == button.locat)
+    {
+        if(update!=NULL)
+        {
+            lv_timer_pause(update);
+        }
+        livmap_install();
+        Menu_state = 2;
+    }
+    if(obj == button.start)
+    {
+        if(code == LV_EVENT_LONG_PRESSED)
+        {
+           if(gps.satellites.value()!=0&&Sport_Statue==0)
+            {
+                lv_label_set_text_fmt(s_statue,"REC");
+                lv_timer_resume(update);
+                lv_obj_set_style_bg_img_src(button.start, &img_src_stop, 0);
+                Sport_Statue = 1;
+            }
+            else if(Sport_Statue==1)
+            {
+                lv_label_set_text_fmt(s_statue,"   ");
+                lv_obj_set_style_bg_img_src(button.start, &img_src_start, 0);
+                lv_timer_pause(update);
+                lv_label_set_text_fmt(unit.Speed,"00");
+                Sport_Statue = 0;
+            } 
+        }
+        
+    }
+}
+uint8_t S=0;
+uint8_t H = 0;
+uint8_t M = 0;
+
+Sport_Time St;
+
+void Sport_Handle()
+{
+    if(Sport_Statue==1)
+    {
+        St.sec++;
+        if(St.sec==60)
+        {
+            St.min++;
+            St.sec=0;
+        }
+        if(St.min==60)
+        {
+            St.hour++;
+            St.min=0;
+        }
+        if(St.hour==99)
+        {
+            St.hour = 99;
+        }
+        if(Menu_state==0)
+        {
+            lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",St.hour,St.min,St.sec);
+        }
+        
+    }
 }
 
+void Ticke_init()
+{
+    Sport_Tick.attach(1,Sport_Handle);
+}
 
+//初始化值
+void Style_Num_Init()
+{
+    lv_label_set_text_fmt(unit.AVG,"%.2f",0.00);
+    lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",00,00,00);
+    lv_label_set_text_fmt(unit.Trip,"%.2f",0.00);
+    lv_label_set_text_fmt(unit.Calorie,"%.2f",0.00);
+}
 
 void Diplat()
 {
@@ -81,6 +198,7 @@ void Diplat()
     lv_label_set_text_fmt(home_lable,"00");
     lv_obj_set_style_text_color(home_lable,lv_color_hex(0xFFFFFF),LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(home_lable,&font_bahnschrift_65,LV_PART_MAIN|LV_STATE_DEFAULT);
+    unit.Speed = home_lable;
     lv_obj_align(home_lable,LV_ALIGN_CENTER,0,12);
 
     home_lable = lv_label_create(main_force);
@@ -124,7 +242,7 @@ void Diplat()
     {
         SubInfoGrp_Create(mation,unitText[i]);
     }
-
+    Style_Num_Init();
     lv_anim_t btn_anim;
     lv_anim_init(&btn_anim);
     lv_obj_t* btn_cont = lv_obj_create(main_home);
@@ -139,14 +257,26 @@ void Diplat()
     lv_anim_set_path_cb(&btn_anim,lv_anim_path_ease_out);
     lv_anim_start(&btn_anim);
     button.menu = Btn_Create(btn_cont,&img_src_menu, 70);
-    button.start = Btn_Create(btn_cont,&img_src_start, 0);
-    button.locat = Btn_Create(btn_cont,&img_src_locate, -70);
+    update = lv_timer_create(Sub_Date,50,0);
+    lv_timer_set_repeat_count(update,-1);
+    if(Sport_Statue==1)
+    {
+        button.start = Btn_Create(btn_cont,&img_src_stop, 0);
+        lv_timer_resume(update);
+    }
+    else
+    {
+        button.start = Btn_Create(btn_cont,&img_src_start, 0);
+        lv_timer_pause(update);
+    }
+    button.locat = Btn_Create(btn_cont,&img_src_locate, -70);    
     btn_group = lv_group_get_default();
     lv_group_add_obj(btn_group,button.start);
     lv_group_add_obj(btn_group,button.menu);
     lv_group_add_obj(btn_group,button.locat);
+    lv_group_focus_obj(button.start);
     lv_obj_add_event_cb(button.menu,Btn_event,LV_EVENT_CLICKED,NULL);
-    lv_obj_add_event_cb(button.start,Btn_event,LV_EVENT_CLICKED,NULL);
+    lv_obj_add_event_cb(button.start,Btn_event,LV_EVENT_LONG_PRESSED,NULL);
     lv_obj_add_event_cb(button.locat,Btn_event,LV_EVENT_CLICKED,NULL);
 }
 
@@ -169,7 +299,14 @@ void SubInfoGrp_Create(lv_obj_t* par, const char* unitText)
     lv_obj_t* label = lv_label_create(cont);
     lv_obj_set_style_text_font(label,&font_bahnschrift_17, 0);
     lv_obj_set_style_text_color(label, lv_color_white(), 0);
-
+    if(strcmp(unitText,"AVG")==0)
+        unit.AVG = label;
+    else if(strcmp(unitText,"Time")==0)
+        unit.Time = label;
+    else if(strcmp(unitText,"Trip")==0)
+        unit.Trip = label;
+    else if(strcmp(unitText,"Calorie")==0)
+        unit.Calorie = label;
     label = lv_label_create(cont);
     lv_obj_set_style_text_font(label, &font_bahnschrift_13, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(0xb3b3b3), 0);

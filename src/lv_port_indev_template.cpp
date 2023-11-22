@@ -11,7 +11,7 @@
  *********************/
 #include "lv_port_indev_template.h"
 #include "lvgl.h"
-
+#include "HAL.h"
 /*********************
  *      DEFINES
  *********************/
@@ -140,6 +140,7 @@ void lv_port_indev_init(void)
     encoder_init();
 
     /*Register a encoder input device*/
+    group= lv_group_create();
     lv_indev_drv_init(&indev_drv);
     indev_drv.type = LV_INDEV_TYPE_ENCODER;
     indev_drv.read_cb = encoder_read;
@@ -331,15 +332,17 @@ static uint32_t keypad_get_key(void)
 /*Initialize your keypad*/
 static void encoder_init(void)
 {
+    
     /*Your code comes here*/
 }
 
 /*Will be called by the library to read the encoder*/
 static void encoder_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
-
-    data->enc_diff = encoder_diff;
-    data->state = encoder_state;
+    static bool lastState;
+    data->enc_diff = HAL::Encoder_GetDiff();
+    bool isPush = (digitalRead(48)==LOW);
+    data->state = isPush ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
 /*Call this function in an interrupt to process encoder events (turn, press)*/

@@ -6,6 +6,7 @@
 #include "lvgl.h"
 #include <animotion.h>
 #include "Diplat.h"
+#include "Statue_Bar.h"
 LV_IMG_DECLARE(yuanshen);
 LV_FONT_DECLARE(font_bahnschrift_17);
 lv_obj_t *yush;
@@ -22,6 +23,8 @@ static void Start_end_cb(lv_anim_t * anim)
 {
     lv_obj_del(Start_over);
     Diplat();
+    Statue_Bar_Cre();
+    Ticke_init();
     Menu_Load(main_home,LV_SCR_LOAD_ANIM_MOVE_BOTTOM,750,50);
     /* 动画结束时执行的操作 */
 }
