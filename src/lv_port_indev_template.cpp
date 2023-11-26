@@ -340,7 +340,7 @@ static void encoder_init(void)
 static void encoder_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static bool lastState;
-    data->enc_diff = HAL::Encoder_GetDiff();
+    data->enc_diff = -(HAL::Encoder_GetDiff());
     bool isPush = (digitalRead(48)==LOW);
     data->state = isPush ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }

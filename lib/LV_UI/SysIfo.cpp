@@ -16,9 +16,10 @@ LV_IMG_DECLARE(img_src_time_info);
 LV_IMG_DECLARE(img_src_map_location);
 LV_IMG_DECLARE(img_src_gyroscope);
 LV_IMG_DECLARE(img_src_compass);
+LV_IMG_DECLARE(img_xiaoxin);
 LV_FONT_DECLARE(font_bahnschrift_17);
 LV_FONT_DECLARE(font_bahnschrift_13);
-#define ITEM_HEIGHT_MIN   100
+#define ITEM_HEIGHT_MIN   240
 #define ITEM_PAD          ((LV_VER_RES - ITEM_HEIGHT_MIN) / 2)
 extern location loc;
 extern Sport_Time St;
@@ -113,12 +114,14 @@ lv_obj_t* root;
 
 void Create()
 {
-    root = lv_obj_create(lv_scr_act());
+    root = lv_img_create(lv_scr_act());
     lv_obj_set_size(root,240,240);
     lv_obj_set_style_border_width(root,0,LV_STATE_DEFAULT);
     lv_obj_set_scrollbar_mode(root,LV_SCROLLBAR_MODE_OFF );
     lv_obj_set_style_pad_ver(root, ITEM_PAD, 0);
-    lv_obj_set_style_bg_color(root, lv_color_hex(0x000000), LV_STATE_DEFAULT);
+    lv_img_set_src(root,&img_xiaoxin);
+    lv_obj_center(root);
+//    lv_obj_set_style_bg_color(root, lv_color_hex(0x000000), LV_STATE_DEFAULT);
     lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(
             root,
@@ -315,11 +318,11 @@ void Style_Init()
 
     lv_style_init(&style.info);
     lv_style_set_text_font(&style.info, &font_bahnschrift_13);
-    lv_style_set_text_color(&style.info, lv_color_hex(0x999999));
+    lv_style_set_text_color(&style.info, lv_color_hex(0XFF0000));
 
     lv_style_init(&style.data);
     lv_style_set_text_font(&style.data, &font_bahnschrift_13);
-    lv_style_set_text_color(&style.data, lv_color_white());
+    lv_style_set_text_color(&style.data, lv_color_hex(0XFF0000));
 }
 
 void Style_Reset()
@@ -343,6 +346,7 @@ void Item_Create(
     lv_obj_enable_style_refresh(false);
     lv_obj_remove_style_all(cont);
     lv_obj_set_width(cont, 220);
+//    lv_obj_set_style_bg_opa(cont,30,LV_STATE_DEFAULT);
 
     lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
     item->cont = cont;
@@ -364,7 +368,7 @@ void Item_Create(
             LV_FLEX_ALIGN_CENTER,
             LV_FLEX_ALIGN_CENTER
     );
-
+    lv_obj_set_style_bg_opa(icon,30,LV_STATE_DEFAULT);
     lv_obj_t* img = lv_img_create(icon);
     lv_obj_enable_style_refresh(false);
     lv_img_set_src(img, img_src);

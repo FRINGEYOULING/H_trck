@@ -19,6 +19,7 @@ LV_IMG_DECLARE(img_src_locate);
 LV_IMG_DECLARE(img_src_pause);
 LV_IMG_DECLARE(img_src_start);
 LV_IMG_DECLARE(img_src_stop);
+LV_IMG_DECLARE(img_Adream);
 #define Sysinfo 1
 #define map_loca 2
 lv_obj_t *main_home;
@@ -47,6 +48,15 @@ typedef struct
     float Trip;
     float Calorie_num;
 }Sport_mation;
+
+typedef struct
+{
+    float AVG;
+    Sport_Time time;
+    float Trip;
+    float Calorie;
+}Last_Date;
+Last_Date Last_date;
 Sport_mation sport_num;
 Untxt_num unit;
 extern TinyGPSPlus gps;
@@ -72,6 +82,9 @@ void Sub_Date(lv_timer_t *tmr)
         full_speed = 0;
         cnt = 0;
     }
+    Last_date.AVG = sport_num.Avg_speed;
+    Last_date.Calorie = (Trip)*0.6142*75;
+    Last_date.Trip = Trip;
 }
 
 static void Btn_event(lv_event_t *e)
@@ -148,7 +161,9 @@ void Sport_Handle()
         {
             lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",St.hour,St.min,St.sec);
         }
-        
+        Last_date.time.hour = St.hour;
+        Last_date.time.min = St.min;
+        Last_date.time.sec = St.sec;
     }
 }
 
@@ -156,26 +171,39 @@ void Ticke_init()
 {
     Sport_Tick.attach(1,Sport_Handle);
 }
-
+uint8_t dateInital_flag = 0;
 //初始化值
 void Style_Num_Init()
 {
-    lv_label_set_text_fmt(unit.AVG,"%.2f",0.00);
-    lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",00,00,00);
-    lv_label_set_text_fmt(unit.Trip,"%.2f",0.00);
-    lv_label_set_text_fmt(unit.Calorie,"%.2f",0.00);
+    if(dateInital_flag==0)
+    {
+        lv_label_set_text_fmt(unit.AVG,"%.2f",0.00);
+        lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",00,00,00);
+        lv_label_set_text_fmt(unit.Trip,"%.2f",0.00);
+        lv_label_set_text_fmt(unit.Calorie,"%.2f",0.00);
+        dateInital_flag = 1;
+    }
+    else
+    {
+        lv_label_set_text_fmt(unit.Trip,"%.2f",Last_date.Trip);
+        lv_label_set_text_fmt(unit.Calorie,"%.2f",Last_date.Calorie);
+        lv_label_set_text_fmt(unit.AVG,"%.2f",Last_date.AVG);
+        lv_label_set_text_fmt(unit.Time,"%02d:%02d:%02d",Last_date.time.hour,
+                            Last_date.time.min,Last_date.time.sec);
+    }
 }
 
 void Diplat()
 {
-    main_home = lv_obj_create(lv_scr_act());
+    main_home = lv_img_create(lv_scr_act());
     lv_obj_remove_style_all(main_home);
     lv_obj_set_size(main_home,240,240);
     lv_obj_set_scrollbar_mode(main_home,LV_SCROLLBAR_MODE_OFF );
 //    lv_obj_clear_flag(main_home, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(main_home,lv_color_hex(0x000000),LV_STATE_DEFAULT);
+//    lv_obj_set_style_bg_color(main_home,lv_color_hex(0x000000),LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(main_home,0,LV_STATE_DEFAULT);
-
+    lv_img_set_src(main_home,&img_Adream);
+    lv_obj_center(main_home);
     lv_anim_t ani_foce;
     lv_anim_init(&ani_foce);
     lv_obj_t *main_force = lv_obj_create(main_home);
@@ -185,6 +213,7 @@ void Diplat()
     lv_obj_set_scrollbar_mode(main_force,LV_SCROLLBAR_MODE_OFF );
     lv_obj_set_style_bg_color(main_force,lv_color_hex(0x363636),LV_STATE_DEFAULT);
     lv_obj_set_style_radius(main_force,15,LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(main_force,95,LV_STATE_DEFAULT);
     lv_obj_set_y(main_force, -36);
     lv_anim_set_var(&ani_foce,main_force);
     lv_anim_set_exec_cb(&ani_foce,(lv_anim_exec_xcb_t) lv_obj_set_height);
@@ -298,7 +327,7 @@ void SubInfoGrp_Create(lv_obj_t* par, const char* unitText)
 
     lv_obj_t* label = lv_label_create(cont);
     lv_obj_set_style_text_font(label,&font_bahnschrift_17, 0);
-    lv_obj_set_style_text_color(label, lv_color_white(), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x93C4EC), 0);
     if(strcmp(unitText,"AVG")==0)
         unit.AVG = label;
     else if(strcmp(unitText,"Time")==0)
@@ -309,7 +338,7 @@ void SubInfoGrp_Create(lv_obj_t* par, const char* unitText)
         unit.Calorie = label;
     label = lv_label_create(cont);
     lv_obj_set_style_text_font(label, &font_bahnschrift_13, 0);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xb3b3b3), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x93C4EC), 0);
     lv_label_set_text(label, unitText);
 }
 
@@ -323,12 +352,12 @@ lv_obj_t* Btn_Create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs)
     lv_obj_align(obj, LV_ALIGN_CENTER, x_ofs, 0);
     lv_obj_set_style_bg_img_src(obj, img_src, 0);
 
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_40, 0);
     lv_obj_set_style_width(obj, 45, LV_STATE_PRESSED);
     lv_obj_set_style_height(obj, 25, LV_STATE_PRESSED);
     lv_obj_set_style_bg_color(obj, lv_color_hex(0x666666), 0);
-    lv_obj_set_style_bg_color(obj, lv_color_hex(0xbbbbbb), LV_STATE_PRESSED);
-    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff931e), LV_STATE_FOCUSED);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(0x93C4EC), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(0xEC18A8), LV_STATE_FOCUSED);
     lv_obj_set_style_radius(obj, 9, 0);
 
     static lv_style_transition_dsc_t tran;
