@@ -11,5 +11,6 @@
         "memory": "cpp",
         "random": "cpp",
         "optional": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "E:/ESP32/H_trck/.pio/libdeps/esp32-s3-devkitc-1/TFT_eSPI"
 }
